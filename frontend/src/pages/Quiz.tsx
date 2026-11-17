@@ -10,7 +10,7 @@ type QuizQuestion = { id: string; question: string; options: string[]; answer_in
 type QuizResult = { questions: QuizQuestion[]; requested: number; generated: number; notice: string }
 const labels: Record<string, string> = { notes: 'My notes', guidelines: 'Guidelines', textbook: 'Textbooks' }
 
-export default function Quiz({ onOpenLibrary }: { onOpenLibrary?: () => void }) {
+export default function Quiz({ onOpenLibrary, active = true }: { onOpenLibrary?: () => void; active?: boolean }) {
   const [loading, setLoading] = useState(true)
   const [documents, setDocuments] = useState<LibraryDocument[]>([])
   const [topic, setTopic] = useState('')
@@ -26,7 +26,17 @@ export default function Quiz({ onOpenLibrary }: { onOpenLibrary?: () => void }) 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => { api<LibraryDocument[]>('/api/library').then(setDocuments).catch(e => setError((e as Error).message)).finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+    if (!active) return
+    let canceled = false
+    api<LibraryDocument[]>('/api/library').then(result => {
+      if (canceled) return
+      setDocuments(result)
+      setDocumentId(previous => previous && !result.some(document => document.id === previous) ? '' : previous)
+    }).catch(error => { if (!canceled) setError((error as Error).message) })
+      .finally(() => { if (!canceled) setLoading(false) })
+    return () => { canceled = true }
+  }, [active])
   async function generate(event: React.FormEvent) {
     event.preventDefault()
     setBusy(true); setError(''); setQuiz(null); setSubmitted(false); setAnswers({}); setPosition(0)

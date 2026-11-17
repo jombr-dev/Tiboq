@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, Copy, Printer } from 'lucide-react'
+import Modal from './Modal'
 
 export default function RecoveryKeyCard({
   recoveryKey,
@@ -22,10 +23,10 @@ export default function RecoveryKeyCard({
     }
   }
 
-  return <div className="recovery-key-print fixed inset-0 z-[60] grid place-items-center overflow-auto bg-slate-950/50 p-5" role="dialog" aria-modal="true" aria-label={title}>
-  <section className="w-full max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-xl">
+  return <Modal label={title} className="recovery-key-print">
+  <section className="recovery-key-card w-full max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-xl">
     <p className="eyebrow">ONE-TIME DISPLAY</p>
-    <h3 className="mt-2 text-lg font-semibold text-slate-900">{title}</h3>
+    <h3 tabIndex={-1} data-modal-heading className="mt-2 text-lg font-semibold text-slate-900">{title}</h3>
     <p className="mt-2 text-xs leading-relaxed text-slate-600">This key can reset your vault password. It will not be shown again. Store it somewhere private and separate from this device.</p>
     <code className="mt-4 block select-all break-all rounded-lg border border-amber-200 bg-white p-4 text-sm font-semibold leading-7 tracking-wider text-slate-900">{recoveryKey}</code>
     <div className="mt-4 flex flex-wrap gap-2 print:hidden">
@@ -41,5 +42,5 @@ export default function RecoveryKeyCard({
       <Check size={16}/>Continue
     </button>
   </section>
-  </div>
+  </Modal>
 }
