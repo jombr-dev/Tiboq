@@ -5,6 +5,7 @@ import { blankRecord, type RecordDraft, type Warning, type DeidFlag, type SavedR
 import ReviewForm, { fields, valueAt, updateAt } from '../components/ReviewForm'
 import CitationView from '../components/CitationView'
 import VoiceRecorder from '../components/VoiceRecorder'
+import WorkspaceHeading from '../components/WorkspaceHeading'
 import TermLookup from '../components/TermLookup'
 export default function Main({ demo, refresh }: { demo: boolean; refresh: () => void }) {
   const [voiceKey, setVoiceKey] = useState(0)
@@ -19,6 +20,10 @@ export default function Main({ demo, refresh }: { demo: boolean; refresh: () => 
   const [completeness, setCompleteness] = useState<{item: string; citation: Citation}[]>([]); const [checkMessage, setCheckMessage] = useState('')
   const [citation, setCitation] = useState<Citation | null>(null); const [deleteId, setDeleteId] = useState<string | null>(null)
   const [lookupTerm, setLookupTerm] = useState('')
+  const hasContent = fields.some(([path]) => valueAt(record, path).trim())
+  const sourceChanged = text !== structuredText
+  const hasUnsavedWork = sourceChanged || (!selected && (hasContent || !!text.trim()))
+  function allowReplace() { return !hasUnsavedWork || window.confirm('Discard your unsaved encounter work? Saved drafts will remain in the vault.') }
   function fail(e: unknown) { setError((e as Error).message) }
   async function loadRecords() { try { setSaved(await api<SavedRecord[]>('/api/records')) } catch (e) { fail(e) } }
   useEffect(() => { void loadRecords() }, [])
@@ -30,7 +35,7 @@ export default function Main({ demo, refresh }: { demo: boolean; refresh: () => 
     return () => {active = false; clearTimeout(timer)}
   }, [record])
   useEffect(() => {
-    if (demo) {
+    if (demo && allowReplace()) {
       post<{text: string; record: RecordDraft}>('/api/demo/presentation', {}).then(sample => {
         setText(sample.text); setStructuredText(sample.text); setRecord(sample.record); setDraftReady(true); setPending(new Set(fields.filter(([p]) => valueAt(sample.record, p)).map(([p]) => p)))
         setNotice('Prewritten fictional demo draft loaded. Review it before saving.'); setSelected(null); setKept(new Set()); setAck(new Set()); setLookupTerm('')
@@ -43,6 +48,7 @@ export default function Main({ demo, refresh }: { demo: boolean; refresh: () => 
     setModelWarnings(prev => prev.filter(w => w.field !== path))
   }
   async function structure() {
+    if (hasContent && !window.confirm('Replace the SOAP draft with a newly structured draft? Your source notes will remain.')) return
     setBusy('structure'); setError(''); setNotice('')
     try {
       const result = await post<{record: RecordDraft; warnings: Warning[]}>('/api/structure', {text})
@@ -58,6 +64,7 @@ export default function Main({ demo, refresh }: { demo: boolean; refresh: () => 
     setLookupTerm(selectedText && selectedText.length <= 80 ? selectedText : '')
   }
   async function confirmSave() {
+    if (!canSave) return
     setBusy('save'); setError('')
     try {
       const review = await post<{flags: DeidFlag[]; warnings: Warning[]}>('/api/review', record)
@@ -80,17 +87,30 @@ export default function Main({ demo, refresh }: { demo: boolean; refresh: () => 
     const result = await post<{flags: {item: string; citation: Citation}[]; message: string}>('/api/completeness', {record})
     setCompleteness(result.flags); setCheckMessage(result.message)
   } catch (e) { fail(e) } finally { setBusy('') } }
-  async function openSaved(id: string) { setError(''); try {
+  async function openSaved(id: string) { if (busy || !allowReplace()) return; setBusy('open'); setVoiceKey(previous => previous + 1); setError(''); try {
     const result = await api<{record: RecordDraft}>(`/api/records/${id}`)
     setText(''); setStructuredText(''); setRecord(result.record); setDraftReady(true); setPending(new Set()); setKept(new Set()); setAck(new Set()); setModelWarnings([]); setSelected(id); setNotice('Opened saved draft. Edits require a new Confirm and save.'); setCompleteness([]); setLookupTerm('')
-  } catch (e) { fail(e) } }
+  } catch (e) { fail(e) } finally { setBusy('') } }
   async function removeSaved(id: string) { try { await api(`/api/records/${id}`, {method:'DELETE'}); setDeleteId(null); if(selected === id) clear(); await loadRecords(); refresh() } catch(e) { fail(e) } }
   const unresolved = flags.some(f => !kept.has(f.id)) || warnings.some(w => !ack.has(w.message))
-  const activeStep = busy === 'structure' ? 2 : text !== structuredText || !draftReady ? 1
-    : selected ? 5 : pending.size || unresolved || reviewedRecord !== record ? 3 : 4
-  const stepLabels = ['01 Capture', '02 Structure', '03 Review', '04 Confirm', '05 Save']
+  const remainingFlags = flags.filter(flag => !kept.has(flag.id)).length
+  const remainingWarnings = warnings.filter(warning => !ack.has(warning.message)).length
+  const canSave = draftReady && hasContent && !sourceChanged && reviewedRecord === record && !pending.size && !unresolved && !busy && !selected
+  const saveMessage = !draftReady || !hasContent ? 'Capture notes and structure a draft, or enter SOAP details, before saving.'
+    : sourceChanged ? 'Source notes changed. Structure from text again before saving.'
+    : reviewedRecord !== record ? 'Checking the latest draft for review flags...'
+    : pending.size || unresolved ? pending.size + ' fields, ' + remainingFlags + ' identifiers and ' + remainingWarnings + ' numeric warnings still need review.'
+    : selected ? 'This version is saved. Editing SOAP details creates a new draft.'
+    : 'Ready to confirm and save to your encrypted vault.'
+  function nextReviewItem() {
+    const path = fields.find(([path]) => pending.has(path))?.[0]
+    const target = path ? document.getElementById(path) : document.getElementById('review-flags')
+    target?.scrollIntoView({ behavior: 'instant', block: 'center' }); target?.focus({ preventScroll: true })
+  }
+  const activeStep = selected && !sourceChanged ? 3 : !draftReady || sourceChanged ? 1 : 2
+  const stepLabels = ['01 Capture', '02 Review', '03 Save']
   return <>
-    <div className="flex flex-wrap items-start justify-between gap-4 mb-7"><div><p className="eyebrow">ENCOUNTER WORKSPACE</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Make room for the encounter.</h1><p className="text-sm text-slate-500 mt-2">Capture what was said. Review what matters. Save when you're ready.</p></div><span className="bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-500">{demo ? 'Fictional demo' : 'Unsaved text stays in memory'}</span></div>
+    <WorkspaceHeading icon={FileText} eyebrow="THE ENCOUNTER STUDIO" title="Patient encounter" description="Turn the conversation into a note you can stand behind."><span className="workspace-session-badge">{demo ? 'Fictional demo' : selected && !sourceChanged ? 'Saved to vault' : 'Draft in memory'}</span></WorkspaceHeading>
     <div className="workflow-steps" aria-label="Encounter workflow">{stepLabels.map((label, index) =>
       <span key={label} aria-current={activeStep === index + 1 ? 'step' : undefined}
         data-complete={index + 1 < activeStep ? 'true' : undefined}>
@@ -99,10 +119,10 @@ export default function Main({ demo, refresh }: { demo: boolean; refresh: () => 
       </span>)}</div>
     {error && <div role="alert" className="error mb-5">{error}</div>}{notice && <div role="status" className="rounded-xl border border-teal-100 bg-teal-50 p-3 text-sm text-teal-800 mb-5">{notice}</div>}
     <div className="encounter-layout grid gap-5 items-start">
-      <div className="space-y-5"><section className="panel p-5"><div className="flex items-center justify-between"><p className="eyebrow">01 · CAPTURE</p><FileText size={17} className="text-slate-400"/></div><h2 className="mt-3 text-lg font-semibold">Patient encounter notes</h2><p className="text-xs leading-relaxed text-slate-500 mt-2 mb-4">Type or dictate. Correct the transcript before structuring; missing facts stay empty. Highlight a term in this box to look it up in your library.</p><VoiceRecorder key={voiceKey} disabled={!!busy} onTranscript={transcript => {setText(prev => prev ? prev + '\n' + transcript : transcript); setLookupTerm('')}} onError={fail}/><label htmlFor="encounter" className="sr-only">Patient encounter text / editable transcript</label><div className="relative"><textarea id="encounter" rows={12} value={text} maxLength={30000} onChange={e => {setText(e.target.value); setLookupTerm('')}} onSelect={e => captureLookupTerm(e.currentTarget)} onMouseUp={e => captureLookupTerm(e.currentTarget)} onKeyUp={e => captureLookupTerm(e.currentTarget)} onTouchEnd={e => {const element = e.currentTarget; window.setTimeout(() => captureLookupTerm(element), 0)}} placeholder="Begin with the presentation…"/>{lookupTerm && <span role="status" className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-teal-800 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">Selected for lookup ↓</span>}</div><div className="flex justify-between text-[10px] text-slate-400 mt-2"><span>LOCAL PROCESSING ONLY</span><span>{text.length.toLocaleString()} / 30,000</span></div><TermLookup term={lookupTerm} disabled={!!busy} onCitation={setCitation}/><button className="btn-primary w-full mt-5" disabled={!!busy || !text.trim()} onClick={structure}><WandSparkles size={16}/>{busy === 'structure' ? 'Structuring locally…' : 'Structure from text'}</button><p className="text-[11px] text-slate-400 leading-relaxed mt-3">AI can make mistakes. Amber fields require your review.</p></section>
-      <section className="panel p-5"><p className="eyebrow mb-4">ENCRYPTED DRAFTS · {saved.length}</p>{!saved.length && <p className="text-xs text-slate-400">Confirmed drafts will appear here.</p>}<div className="space-y-3">{saved.map(item => <div key={item.id} className="border-b border-slate-100 pb-3"><button onClick={() => openSaved(item.id)} className="text-left w-full text-sm font-medium hover:text-teal-700">{item.chief_complaint || 'Patient encounter draft'}</button><div className="flex justify-between items-center mt-1"><span className="text-[10px] text-slate-400">{new Date(item.timestamp).toLocaleString()}</span><button aria-label="Delete saved record" className="text-slate-400 hover:text-red-700" onClick={() => setDeleteId(item.id)}><Trash2 size={13}/></button></div>{deleteId === item.id && <div className="text-xs mt-2 text-red-800">Delete permanently?<div className="flex gap-3 mt-2"><button onClick={() => removeSaved(item.id)}>Delete</button><button onClick={() => setDeleteId(null)}>Cancel</button></div></div>}</div>)}</div></section></div>
-      <section className="panel overflow-hidden"><div className="p-5 border-b border-slate-100 flex justify-between items-start"><div><p className="eyebrow">02 · REVIEW</p><h2 className="mt-3 text-lg font-semibold">Your SOAP draft</h2></div><span className={`text-[10px] font-semibold rounded-full px-2.5 py-1 ${pending.size ? 'bg-amber-50 text-amber-800' : 'bg-teal-50 text-teal-800'}`}>{pending.size ? `${pending.size} to review` : 'All fields editable'}</span></div><div className="p-2"><ReviewForm record={record} pending={pending} warnings={[...warnings, ...modelWarnings]} onConfirm={path => setPending(prev => {const s = new Set(prev); s.delete(path); return s})} onChange={edit}/></div><div className="p-5 border-t border-slate-100 space-y-3"><button className="btn-primary w-full" disabled={!!busy || pending.size > 0 || unresolved} onClick={confirmSave}><Save size={16}/>{busy === 'save' ? 'Encrypting…' : 'Confirm and save'}</button><div className="flex gap-2"><button className="btn flex-1" disabled={!!busy} onClick={clear}><Eraser size={14}/>Clear</button><button className="btn flex-1" disabled={!selected || !!busy} onClick={() => selected && downloadPdf(selected).catch(fail)}><Download size={14}/>Export PDF</button></div><p className="text-[10px] text-slate-400 text-center">Export uses the saved version. Downloaded PDFs are not encrypted.</p></div></section>
-      <aside className="space-y-5"><section className="panel p-5"><p className="eyebrow">03 · CHECK</p><h2 className="text-lg font-semibold mt-3">Review flags</h2><p className="text-xs text-slate-500 leading-relaxed mt-2 mb-5">Warning aids, not a guarantee. These checks cannot establish clinical accuracy or de-identification.</p>
+      <div className="space-y-5"><section className="panel p-5"><div className="flex items-center justify-between"><p className="eyebrow">01 · CAPTURE</p><FileText size={17} className="text-slate-400"/></div><h2 className="mt-3 text-lg font-semibold">Patient encounter notes</h2><p className="text-xs leading-relaxed text-slate-500 mt-2 mb-4">Type or dictate your notes. Check the transcript before creating a draft.</p><VoiceRecorder key={voiceKey} disabled={!!busy} onTranscript={transcript => {setText(prev => prev ? prev + '\n' + transcript : transcript); setLookupTerm('')}} onError={fail}/><label htmlFor="encounter" className="sr-only">Patient encounter text / editable transcript</label><div className="relative"><textarea id="encounter" disabled={!!busy} rows={12} value={text} maxLength={30000} onChange={e => {setText(e.target.value); setLookupTerm('')}} onSelect={e => captureLookupTerm(e.currentTarget)} onMouseUp={e => captureLookupTerm(e.currentTarget)} onKeyUp={e => captureLookupTerm(e.currentTarget)} onTouchEnd={e => {const element = e.currentTarget; window.setTimeout(() => captureLookupTerm(element), 0)}} placeholder="Begin with the presentation…"/>{lookupTerm && <span role="status" className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-teal-800 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">Selected for lookup ↓</span>}</div><div className="flex justify-between text-[10px] text-slate-400 mt-2"><span>LOCAL PROCESSING ONLY</span><span>{text.length.toLocaleString()} / 30,000</span></div><details className="quiet-disclosure" open={lookupTerm ? true : undefined}><summary>Look up a term in your sources</summary><TermLookup term={lookupTerm} disabled={!!busy} onCitation={setCitation}/></details><button className="btn-primary w-full mt-5" disabled={!!busy || !text.trim()} onClick={structure}><WandSparkles size={16}/>{busy === 'structure' ? 'Structuring locally…' : 'Structure from text'}</button><p className="text-[11px] text-slate-400 leading-relaxed mt-3">AI can make mistakes. Amber fields require your review.</p></section>
+      <details className="panel saved-drafts p-5"><summary>Saved drafts <span className="count-badge">{saved.length}</span></summary><p className="sr-only">ENCRYPTED DRAFTS · {saved.length}</p>{!saved.length && <p className="text-xs text-slate-400">Confirmed drafts will appear here.</p>}<div className="space-y-3">{saved.map(item => <div key={item.id} className="border-b border-slate-100 pb-3"><button onClick={() => openSaved(item.id)} className="text-left w-full text-sm font-medium hover:text-teal-700">{item.chief_complaint || 'Patient encounter draft'}</button><div className="flex justify-between items-center mt-1"><span className="text-[10px] text-slate-400">{new Date(item.timestamp).toLocaleString()}</span><button aria-label="Delete saved record" className="text-slate-400 hover:text-red-700" onClick={() => setDeleteId(item.id)}><Trash2 size={13}/></button></div>{deleteId === item.id && <div className="text-xs mt-2 text-red-800">Delete permanently?<div className="flex gap-3 mt-2"><button onClick={() => removeSaved(item.id)}>Delete</button><button onClick={() => setDeleteId(null)}>Cancel</button></div></div>}</div>)}</div></details></div>
+      <section className="panel soap-panel overflow-hidden"><div className="p-5 border-b border-slate-100 flex justify-between items-start"><div><p className="eyebrow">02 · REVIEW</p><h2 className="mt-3 text-lg font-semibold">Your SOAP draft</h2><p className="soap-draft-caption">An editable note organized for a careful review.</p></div><span className={`text-[10px] font-semibold rounded-full px-2.5 py-1 ${pending.size ? 'bg-amber-50 text-amber-800' : 'bg-teal-50 text-teal-800'}`}>{pending.size ? `${pending.size} to review` : draftReady ? 'All fields editable' : 'Awaiting notes'}</span></div><fieldset disabled={!!busy} className="p-2">{!draftReady && <div className="draft-empty"><FileText size={32} aria-hidden="true"/><h3>Your draft will appear here</h3><p>Add encounter notes and choose Structure from text. You can also enter SOAP details yourself.</p><button className="btn" onClick={() => setDraftReady(true)}>Enter details manually</button></div>}{draftReady && <><ReviewForm record={record} pending={pending} warnings={[...warnings, ...modelWarnings]} onConfirm={path => setPending(prev => {const s = new Set(prev); s.delete(path); return s})} onChange={edit}/></>}</fieldset><div className="p-5 border-t border-slate-100 space-y-3"><p id="save-readiness" role="status" className="text-sm text-slate-700">{saveMessage}</p>{(pending.size > 0 || unresolved) && <button className="btn w-full" onClick={nextReviewItem}>Go to next review item</button>}<button className="btn-primary w-full" aria-describedby="save-readiness" disabled={!canSave} onClick={confirmSave}><Save size={16}/>{busy === 'save' ? 'Encrypting…' : 'Confirm and save'}</button><div className="flex gap-2"><button className="btn flex-1" disabled={!!busy} onClick={() => { if (allowReplace()) clear() }}><Eraser size={14}/>Clear</button><button className="btn flex-1" disabled={!selected || !!busy} onClick={() => selected && downloadPdf(selected).catch(fail)}><Download size={14}/>Export PDF</button></div><p className="text-[10px] text-slate-400 text-center">Export uses the saved version. Downloaded PDFs are not encrypted.</p></div></section>
+      <aside className="space-y-5" hidden={!draftReady}><section id="review-flags" tabIndex={-1} className="panel p-5"><p className="eyebrow">REVIEW CHECKS</p><h2 className="text-lg font-semibold mt-3">Review flags</h2><p className="text-xs text-slate-500 leading-relaxed mt-2 mb-5">Resolve identifiers and numeric warnings before saving. These checks do not establish clinical accuracy.</p>
       {!warnings.length && !flags.length && !modelWarnings.length && <div className="rounded-xl bg-slate-50 p-4 text-xs text-slate-500 flex gap-2"><Check size={16} className="text-teal-700 flex-shrink-0"/>No numeric or identifier warnings so far.</div>}
       {modelWarnings.map((w, i) => <p key={i} className="text-xs text-amber-800 bg-amber-50 rounded-lg p-3 mb-3">{w.message}</p>)}
       {warnings.map((w, i) => <div key={i} className="rounded-xl bg-amber-50 p-3 mb-3"><div className="text-xs text-amber-900 flex gap-2"><AlertTriangle size={14} className="flex-shrink-0"/>{w.message}</div><label className="text-xs mt-3 flex items-start gap-2 text-amber-900"><input type="checkbox" className="!w-auto mt-0.5" checked={ack.has(w.message)} onChange={e => setAck(prev => {const next = new Set(prev); e.target.checked ? next.add(w.message) : next.delete(w.message); return next})}/>I checked this value against the source.</label></div>)}

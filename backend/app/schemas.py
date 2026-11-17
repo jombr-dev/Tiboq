@@ -65,6 +65,22 @@ class AskInput(StrictModel):
     question: str = Field(min_length=1, max_length=2000)
     scope: list[Literal['notes', 'guidelines', 'textbook']] = Field(default_factory=lambda: ['notes', 'guidelines', 'textbook'])
 
+
+class QuizInput(StrictModel):
+    topic: str = Field(min_length=2, max_length=200)
+    count: int = Field(ge=1, le=20)
+    difficulty: Literal['easy', 'medium', 'hard']
+    scope: list[Literal['notes', 'guidelines', 'textbook']] = Field(min_length=1)
+    document_ids: list[str] = Field(default_factory=list, max_length=50)
+
+
+class QuizDraft(StrictModel):
+    question: str = Field(min_length=10, max_length=500)
+    options: list[str] = Field(min_length=4, max_length=4)
+    answer_index: int = Field(ge=0, le=3)
+    explanation: str = Field(default='', max_length=500)
+    evidence_quote: str = Field(default='', max_length=600)
+
 class TermLookupInput(StrictModel):
     term: str = Field(min_length=1, max_length=80)
     scope: list[Literal['notes', 'guidelines', 'textbook']] = Field(default_factory=lambda: ['notes', 'guidelines', 'textbook'])
