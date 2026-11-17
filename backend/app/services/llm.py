@@ -110,14 +110,16 @@ def _generation_metadata(result: dict) -> dict[str, Any]:
 
 async def generate_validated(prompt: str, schema_model: type[T],
                              validator_extra: Callable[[T], T | None] | None = None,
-                             max_attempts: int = 2, *, data: dict) -> ValidatedGeneration[T]:
+                             max_attempts: int = 2, *, data: dict,
+                             num_predict: int | None = None,
+                             timeout_seconds: float | None = None) -> ValidatedGeneration[T]:
     """Generate schema-bound JSON and reject transport, truncation, schema and grounding failures."""
     if max_attempts < 1:
         raise ValueError('max_attempts must be at least one')
     failure_reason = 'invalid_response'
     raw_output = ''
     metadata: dict[str, Any] = {}
-    deadline = time.monotonic() + RAG_TIMEOUT_SECONDS
+    deadline = time.monotonic() + (timeout_seconds if timeout_seconds is not None else RAG_TIMEOUT_SECONDS)
     for attempt in range(max_attempts):
         # A transport failure must not be reported with output from an earlier attempt.
         raw_output = ''
@@ -138,7 +140,7 @@ async def generate_validated(prompt: str, schema_model: type[T],
                 # strings. JSON mode plus strict Pydantic validation is deterministic here.
                 'format': 'json',
                 'options': {'temperature': 0, 'num_ctx': 8192, 'num_thread': 4,
-                            'num_predict': RAG_NUM_PREDICT},
+                            'num_predict': num_predict if num_predict is not None else RAG_NUM_PREDICT},
                 'messages': [{'role': 'system', 'content': prompt + retry_instruction},
                              {'role': 'user', 'content': json.dumps(data, ensure_ascii=False)}],
             }, timeout_seconds=remaining)

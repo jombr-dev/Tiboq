@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { ArrowUp, BookOpen, MessageSquareText, Search, ShieldCheck } from 'lucide-react'
+import WorkspaceHeading from '../components/WorkspaceHeading'
 import { ApiError, post } from '../api'
 import type { Citation } from '../types'
 import CitationView from '../components/CitationView'
@@ -12,7 +13,7 @@ interface AskResult {
   model_error?: { reason: string; message: string } | null
 }
 
-export default function Ask() {
+export default function Ask({ onOpenLibrary }: { onOpenLibrary?: () => void }) {
   const [question, setQuestion] = useState('')
   const [scope, setScope] = useState(['notes', 'guidelines', 'textbook'])
   const [result, setResult] = useState<AskResult | null>(null)
@@ -44,16 +45,15 @@ export default function Ask() {
   }
 
   return <div className="ask-page max-w-4xl mx-auto">
-    <div className="ask-intro"><div className="ask-orb"><Search size={24}/></div><p className="eyebrow">YOUR KNOWLEDGE, IN CONTEXT</p>
-    <h1 className="mt-3 text-4xl font-semibold tracking-tight">Ask your sources<span className="text-[#4eab80]">.</span></h1>
-    <p className="text-sm text-slate-500 mt-3 mb-4">A question for your own library. Every answer stays connected to the text it came from.</p></div>
+    <WorkspaceHeading icon={MessageSquareText} eyebrow="ANSWERS WITH CONTEXT" title="Ask your sources" description="Explore your library, with the original passage always close by."/>
+    {onOpenLibrary && !result && <div className="section-context"><span><BookOpen size={14} aria-hidden="true"/>Your library is the starting point.</span><button type="button" disabled={busy} onClick={onOpenLibrary}>Manage sources &rarr;</button></div>}
     <section className="panel ask-composer p-5">
-      <div className="flex flex-wrap gap-3 items-center mb-3"><span className="text-xs font-semibold text-slate-500">Search in</span>
+      <fieldset className="source-scope"><legend>Search in</legend><div>
         {[['notes', 'My notes'], ['guidelines', 'Guidelines'], ['textbook', 'Textbooks']].map(([id, label]) =>
-          <label key={id} className="text-xs flex items-center gap-2 text-slate-600"><input type="checkbox" className="!w-auto accent-teal-800" disabled={busy} checked={scope.includes(id)} onChange={e => setScope(prev => e.target.checked ? [...prev, id] : prev.filter(s => s !== id))} />{label}</label>)}
-      </div>
+          <label key={id} className="scope-choice"><input type="checkbox" className="!w-auto accent-teal-800" disabled={busy} checked={scope.includes(id)} onChange={e => setScope(prev => e.target.checked ? [...prev, id] : prev.filter(s => s !== id))} />{label}</label>)}
+      </div></fieldset>
       <form ref={form} onSubmit={ask}>
-        <label htmlFor="question" className="sr-only">Ask a question from your local library</label>
+        <label htmlFor="question" className="composer-label">What would you like to explore?</label>
         <textarea id="question" rows={2} maxLength={2000} value={question} disabled={busy} onChange={e => setQuestion(e.target.value)} placeholder="What should my chest pain presentation document?" />
         <div className="flex items-center justify-between mt-4 gap-3"><p className="text-[11px] text-slate-400 flex items-center gap-2"><BookOpen size={14} />Only indexed sources are searched.</p>
           <button className="btn-primary" disabled={busy || !question.trim() || !scope.length}>{busy ? 'Searching locally…' : 'Ask library'}<ArrowUp size={16} /></button>
@@ -61,6 +61,7 @@ export default function Ask() {
       </form>
     </section>
 
+    {busy && <div role="status" className="search-progress"><Search size={18} aria-hidden="true"/><div><strong>Searching your selected sources</strong><p>Local processing can take a moment. Your answer will appear here.</p></div><progress aria-label="Searching local sources"/></div>}
     {error && <div role="alert" className="error mt-5"><p className="font-semibold">{modelError ? 'Local answer model error' : 'Local search could not be completed'}</p><p className="mt-1">{error}</p><p className="text-xs mt-2">This error does not establish whether your library covers the question.</p><button className="btn !text-xs mt-3" disabled={busy} onClick={() => form.current?.requestSubmit()}>Retry question</button></div>}
 
     {result?.status === 'answered' && <section className="panel result-answered p-5 mt-4" aria-live="polite">
@@ -87,7 +88,7 @@ export default function Ask() {
       <p className="text-xs text-slate-500 mt-2">No passage met the matching checks and no source-backed answer is available. This is not proof that the information is absent. Try a more specific question or another source scope.</p>
     </section>}
 
-    {!result && !error && !busy && <div className="text-center py-16"><MessageSquareText size={33} className="mx-auto mb-5 text-slate-300" /><h2 className="text-base font-medium text-slate-600">Begin with something you're learning.</h2><p className="text-xs text-slate-400 mt-2">No sources yet? Load the sample library from My library.</p><div className="flex flex-wrap justify-center gap-2 mt-6">{['What does SOAP stand for?', 'What chest pain details should I document?', 'What fever details should I document?'].map(sample => <button key={sample} className="btn !text-xs" onClick={() => setQuestion(sample)}>{sample}</button>)}</div></div>}
+    {!result && !error && !busy && <div className="question-starters"><h2 className="text-base font-medium text-slate-600">Try a question</h2><p className="text-xs text-slate-400 mt-2">Choose an example below or write your own question.</p><div className="starter-grid">{['What does SOAP stand for?', 'What chest pain details should I document?', 'What fever details should I document?'].map(sample => <button key={sample} className="starter-card" onClick={() => { setQuestion(sample); document.getElementById('question')?.focus() }}><BookOpen size={18} aria-hidden="true"/><span>{sample}</span><ArrowUp size={15} aria-hidden="true"/></button>)}</div></div>}
     {selected && <CitationView citation={selected} onClose={() => setSelected(null)} />}
   </div>
 }

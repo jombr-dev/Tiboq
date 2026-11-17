@@ -165,6 +165,9 @@ CPU int8 is enforced for STT. Ollama's host is fixed in application code to loop
 
 ### Library
 
+Use **Quiz yourself** after importing notes. Enter a topic, choose 1–20 multiple-choice questions and Easy, Medium, or Hard difficulty, then select source types or one specific document. The local Ollama model drafts questions from retrieved passages; the backend rejects questions whose marked answer and quoted evidence do not match the selected source. A thin library may produce fewer questions than requested. Answer every question to see your score, the cited passage, and page or section context. Quizzes remain in the unlocked browser session and are cleared when the vault locks. Generated questions are study aids and still need source review.
+
+
 Choose up to ten PDF/DOCX/TXT/MD/image files, set **My notes / Guideline / Textbook**, and optionally enable best-effort local OCR. For every identifier warning, choose **Keep** or **Remove** before **Proceed and index**; removed text is replaced before encryption and indexing. **Keep all** and **Remove all** provide a starting point that you can adjust item by item. You may cancel or exclude individual files; unfinished uploads are not saved. If a batch partly succeeds, completed files remain in the library; exclude those before retrying failed files.
 
 Uploads are bounded to 20 MB/file, 30 MB combined, 32 MB including request framing, 500 pages per PDF, 2,000 chunks per document, and 2,000,000 extracted characters; multipart content stays in memory. OCR uses Tesseract through stdin/stdout, avoiding plaintext image temporary files. Originals are not retained. Parsed text, filenames, tags, timestamps, and vectors are encrypted in SQLite. The index is reconstructed in memory at unlock, then cleared at lock.

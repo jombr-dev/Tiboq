@@ -14,7 +14,7 @@ from app.services.structure import structure
 from app.services.store import Vault
 from app.services import llm, network
 from app.dependencies import unlocked
-from app.routers import records, library, demo, voice
+from app.routers import records, library, demo, voice, quiz
 
 # Keep bounded uploads in memory: no plaintext multipart spools on disk.
 MultiPartParser.spool_max_size = 32 * 1024 * 1024
@@ -92,6 +92,8 @@ async def validation_error(request: Request, exc: RequestValidationError):
         return JSONResponse(status_code=422, content={'detail': 'Invalid recovery settings request.'})
     if request.url.path == '/api/unlock':
         return JSONResponse(status_code=422, content={'detail': 'Enter a valid vault password.'})
+    if request.url.path == '/api/quiz/generate':
+        return JSONResponse(status_code=422, content={'detail': 'Choose a topic, 1–20 questions, a difficulty, and at least one source type.'})
     return JSONResponse(status_code=422, content={'detail': 'Invalid fields. Use the complete record schema, numeric values for vitals, and explicit confirmation when saving.'})
 
 @app.exception_handler(llm.ModelGenerationError)
@@ -176,6 +178,7 @@ app.include_router(records.router)
 app.include_router(library.router)
 app.include_router(demo.router)
 app.include_router(voice.router)
+app.include_router(quiz.router)
 
 if __name__ == '__main__':
     import logging
