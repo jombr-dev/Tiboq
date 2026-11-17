@@ -1,4 +1,5 @@
-import { Check, UserRound } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Check, UserRound, ChevronDown } from 'lucide-react'
 import type { RecordDraft, Warning } from '../types'
 export const fields = [
   ['patient.age', 'Age (years)', 'number'], ['patient.sex', 'Sex as stated', 'text'],
@@ -30,6 +31,31 @@ const groups = [
   { letter: 'A', title: 'Assessment', note: 'Only what was explicitly stated', paths: ['assessment'], className: 'review-group-assessment' },
   { letter: 'P', title: 'Plan', note: 'Only what was explicitly stated', paths: ['plan'], className: 'review-group-plan' },
 ]
+function SoapGroup({ group, remaining, populated, needsAttention, children }: {
+  group: (typeof groups)[number]
+  remaining: number
+  populated: boolean
+  needsAttention: boolean
+  children: ReactNode
+}) {
+  const [expanded, setExpanded] = useState(populated || needsAttention || group.className === 'review-group-patient')
+  useEffect(() => { if (needsAttention) setExpanded(true) }, [needsAttention])
+  return <details className={`review-group ${group.className}`} open={expanded} onToggle={event => setExpanded(event.currentTarget.open)}>
+    <summary className="review-group-heading">
+      <div className="soap-section-identity">
+        <span className="soap-section-letter" aria-hidden="true">{group.letter || <UserRound size={18}/>}</span>
+        <div><h3>{group.title}</h3><p>{group.note}</p></div>
+      </div>
+      <span className="soap-section-controls">
+        {remaining > 0 ? <span className="soap-review-count">{remaining} to review</span>
+          : <span className="soap-section-status">{populated ? <><Check size={13} aria-hidden="true"/>Fields reviewed</> : 'Not stated'}</span>}
+        <ChevronDown size={16} className="soap-expand-icon" aria-hidden="true"/>
+      </span>
+    </summary>
+    <div className="review-group-fields">{children}</div>
+  </details>
+}
+
 export default function ReviewForm({ record, onChange, pending, onConfirm, warnings }: {
   record: RecordDraft; onChange: (record: RecordDraft, path: string) => void; pending: Set<string>
   onConfirm: (path: string) => void; warnings: Warning[]
@@ -48,16 +74,9 @@ export default function ReviewForm({ record, onChange, pending, onConfirm, warni
     const groupFields = fields.filter(([path]) => group.paths.includes(path))
     const remaining = groupFields.filter(([path]) => pending.has(path)).length
     const populated = groupFields.some(([path]) => valueAt(record, path).trim())
-    return <section key={group.title} className={`review-group ${group.className}`} aria-label={group.title}>
-      <div className="review-group-heading">
-        <div className="soap-section-identity">
-          <span className="soap-section-letter" aria-hidden="true">{group.letter || <UserRound size={18}/>}</span>
-          <div><h3>{group.title}</h3><p>{group.note}</p></div>
-        </div>
-        {remaining > 0 ? <span className="soap-review-count">{remaining} to review</span>
-          : <span className="soap-section-status">{populated ? <><Check size={13} aria-hidden="true"/>Reviewed</> : 'Not stated'}</span>}
-      </div>
-      <div className="review-group-fields">{groupFields.map(renderField)}</div>
-    </section>
+    return <SoapGroup key={group.title} group={group} remaining={remaining} populated={populated}
+      needsAttention={remaining > 0 || warnings.some(warning => group.paths.includes(warning.field))}>
+      {groupFields.map(renderField)}
+    </SoapGroup>
   })}</div>
 }

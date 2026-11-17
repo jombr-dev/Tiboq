@@ -55,7 +55,7 @@ export default function Ask({ onOpenLibrary }: { onOpenLibrary?: () => void }) {
       <form ref={form} onSubmit={ask}>
         <label htmlFor="question" className="composer-label">What would you like to explore?</label>
         <textarea id="question" rows={2} maxLength={2000} value={question} disabled={busy} onChange={e => setQuestion(e.target.value)} placeholder="What should my chest pain presentation document?" />
-        <div className="flex items-center justify-between mt-4 gap-3"><p className="text-[11px] text-slate-400 flex items-center gap-2"><BookOpen size={14} />Only indexed sources are searched.</p>
+        <div className="flex items-center justify-between mt-4 gap-3"><p className="text-xs text-slate-400 flex items-center gap-2"><BookOpen size={14} />Only indexed sources are searched.</p>
           <button className="btn-primary" disabled={busy || !question.trim() || !scope.length}>{busy ? 'Searching locally…' : 'Ask library'}<ArrowUp size={16} /></button>
         </div>
       </form>

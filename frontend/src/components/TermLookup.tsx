@@ -68,7 +68,7 @@ export default function TermLookup({
     {error && <p role="alert" className="mt-3 text-xs text-red-700">{error}</p>}
 
     {result?.status === 'answered' && <div className="mt-3 border-t border-slate-200 pt-3">
-      <p className="text-[10px] font-semibold tracking-wider text-teal-700">EXACT SOURCE EXCERPT</p>
+      <p className="text-xs font-semibold tracking-wider text-teal-700">EXACT SOURCE EXCERPT</p>
       <blockquote className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{result.answer}</blockquote>
       <div className="flex flex-wrap gap-2 mt-3">{result.citations.map(item =>
         <button type="button" key={item.chunk_id} className="text-xs text-teal-700 underline" onClick={() => onCitation(item)}>

@@ -6,6 +6,7 @@ import type { Status } from './types'
 import Lock from './pages/Lock'
 import QuickSwitcher from './components/QuickSwitcher'
 import { workspacePages, type Page } from './workspace'
+import SessionPage from './components/SessionPage'
 import Main from './pages/Main'
 import Library from './pages/Library'
 import Ask from './pages/Ask'
@@ -100,16 +101,16 @@ export default function App() {
       <main id="workspace-content" ref={content} tabIndex={-1} className="workspace-content">
         {error && <p role="alert" className="error mb-5">{error}</p>}
         {demoBusy && <p role="status" className="text-sm text-teal-800 mb-4">Preparing sample sources locally...</p>}
-        <div hidden={page !== 'main'}><Main demo={demo} refresh={refresh}/></div>
-        {page === 'library' && <Library demo={demo} refresh={refresh} onNavigate={navigate}/>}
-        {page === 'ask' && <Ask onOpenLibrary={() => navigate('library')}/>}
-        {page === 'quiz' && <Quiz onOpenLibrary={() => navigate('library')}/>}
+        <SessionPage active={page === 'main'}><Main active={page === 'main'} demo={demo} refresh={refresh}/></SessionPage>
+        <SessionPage active={page === 'library'}><Library active={page === 'library'} demo={demo} refresh={refresh} onNavigate={navigate}/></SessionPage>
+        <SessionPage active={page === 'ask'}><Ask onOpenLibrary={() => navigate('library')}/></SessionPage>
+        <SessionPage active={page === 'quiz'}><Quiz active={page === 'quiz'} onOpenLibrary={() => navigate('library')}/></SessionPage>
         {page === 'settings' && <RecoverySettings configured={status?.recovery_configured ?? false} refresh={refresh}/>}
       </main>
     </div> : <main id="workspace-content" className="flex-1 px-6 lg:px-10">
       {status ? <Lock initialized={status.initialized} recoveryConfigured={status.recovery_configured} onUnlock={unlock}/> : <p role="status" className="text-center py-16 text-sm text-slate-500">{error ? 'Connect to the local backend to open your vault.' : 'Connecting to your local workspace...'}</p>}
       {error && <div className="max-w-lg mx-auto mb-6"><p role="alert" className="error">{error}</p><button className="btn mt-3" onClick={refresh}>Retry local backend</button></div>}
     </main>}
-    <footer className="border-t border-slate-200 px-5 py-4 text-center text-[11px] text-slate-500">Draft-support tool. Not a diagnostic tool and not the official medical record.</footer>
+    <footer className="border-t border-slate-200 px-5 py-4 text-center text-[11px] text-slate-500">Unsaved work clears when the vault locks. Draft-support tool; not a diagnostic tool or the official medical record.</footer>
   </div>
 }

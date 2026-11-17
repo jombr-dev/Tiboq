@@ -227,7 +227,7 @@ Initial model downloads were denied by the cloud egress policy. After adding the
 
 ## Known limitations
 
-- Optional quiz mode is omitted. OCR and dictation are included; OCR and multilingual speech recognition can still misread content.
+- Quiz mode uses your imported sources and requires the prepared local models. OCR and multilingual speech recognition can still misread content.
 - All default model weights are prepared in this cloud workspace. New devices must download or copy them before going offline.
 - Conservative verbatim extraction may leave explicitly stated facts blank when phrasing/units are ambiguous, and cannot prove the model understood negation perfectly. Always review.
 - No unit conversion; age is years and temperature is Celsius. No clinical dose checking or diagnosis. Lab recognition is limited to common labeled values.
@@ -241,3 +241,7 @@ Initial model downloads were denied by the cloud egress policy. After adding the
 - Exported PDFs are **unencrypted**. One-page export reduces font size to a minimum of 8pt; oversized drafts or unsupported glyphs fail clearly instead of truncating content.
 - DOCX sections approximate locations; chunk token counts are estimates. Parsing is bounded, not a full sandbox for hostile documents. Local source parsing should use trusted files.
 - The offline panel cannot prove how separately launched Ollama or other OS programs are configured. Its loopback model calls and guarded backend are verifiable; external adapter/firewall isolation provides stronger device-level evidence.
+
+### Frontend interaction checks
+
+Run `npm test --prefix frontend` for DOM-based checks of unlocked-session navigation, quiz answers, import decisions, recorder cleanup, recovery confirmation, and SOAP section expansion. These tests use synthetic data and mocked browser/media APIs; they do not access the local vault, exercise physical microphone hardware, or verify visual layouts and native browser focus trapping. Unsaved Ask, Quiz and Library work stays in memory while switching sections and is discarded when the vault locks.

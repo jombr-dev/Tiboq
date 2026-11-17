@@ -1,10 +1,11 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 
 /** Native modal behavior keeps keyboard focus and pointer interaction inside. */
-export default function Modal({ label, onClose, children }: {
+export default function Modal({ label, onClose, children, className = '' }: {
   label: string
-  onClose: () => void
+  onClose?: () => void
   children: ReactNode
+  className?: string
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
@@ -13,6 +14,7 @@ export default function Modal({ label, onClose, children }: {
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     element.showModal()
+    element.querySelector<HTMLElement>('[data-modal-heading]')?.focus()
     return () => {
       element.close()
       document.body.style.overflow = overflow
@@ -20,10 +22,10 @@ export default function Modal({ label, onClose, children }: {
     }
   }, [])
 
-  return <dialog ref={dialog} aria-label={label} className="source-modal"
-    onCancel={event => { event.preventDefault(); onClose() }}>
+  return <dialog ref={dialog} aria-label={label} className={`source-modal ${className}`}
+    onCancel={event => { event.preventDefault(); onClose?.() }}>
     <div className="source-modal-surface" onClick={event => {
-      if (event.target === event.currentTarget) onClose()
+      if (event.target === event.currentTarget) onClose?.()
     }}>{children}</div>
   </dialog>
 }
